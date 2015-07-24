@@ -1,0 +1,41 @@
+################################
+# CA Settings #
+################################
+
+# The CA Certificate belonging to the private key on the HSM
+CACERT=cacert.pem
+
+# Directory to place signed certs and CSRs.
+CERTDIR=certs/
+
+# CFSSL configuration
+CONFIG=ca-config.json
+
+# CFSSL profile
+PROFILE=server
+
+# HSM user PIN to unlock the private key
+PIN=123456
+
+################################
+# PKCS11 Module overrides
+# Uncomment and edit if your
+# paths aren't found by the
+# primary script.
+################################
+
+# SPYMODULE=/usr/local/Cellar/opensc/0.14.0_1/lib/pkcs11/pkcs11-spy.so
+# MODULE=/usr/local/Cellar/opensc/0.14.0_1/lib/pkcs11/opensc-pkcs11.so
+
+################################
+# HSM settings - uncomment one #
+################################
+
+# Yubikey NEO settings
+SLOT="Yubico Yubikey NEO OTP+CCID"
+LABEL="SIGN key"
+
+# SoftHSM on Linux64
+# MODULE=/usr/lib64/softhsm/libsofthsm.so
+# SLOT="SoftHSM"
+# LABEL="My HSM"
