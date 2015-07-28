@@ -33,6 +33,7 @@ PIN=123456
 
 # Yubikey NEO settings
 SLOT="Yubico Yubikey NEO OTP+CCID"
+# or  "Yubico Yubikey NEO CCID" if OTP is diabled
 LABEL="SIGN key"
 
 # SoftHSM on Linux64

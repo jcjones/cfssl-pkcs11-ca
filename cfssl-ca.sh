@@ -24,6 +24,12 @@ die() {
   exit 1
 }
 
+join() {
+  local IFS="$1"
+  shift
+  echo "$*"
+}
+
 debug() {
   echo "Enabling PKCS11 Spying"
   [ -r "${SPYMODULE}" ] \
@@ -71,8 +77,14 @@ Slot 0 (0x1): Yubico Yubikey NEO OTP+CCID
   hardware version   : 0.0
   firmware version   : 0.0
   serial num         : 00000000
+
+
+********************************************************************************
+</example>
+********************************************************************************
+
 EOF
-  pkcs11-tool --module "${MODULE}" --login --pin "${PIN}" --list-objects
+  pkcs11-tool --module "${MODULE}" --login --pin "${PIN}" --list-slots
 
   cat <<EOF
 ********************************************************************************
@@ -93,6 +105,12 @@ Public Key Object; RSA 2048 bits
 Certificate Object, type = X.509 cert
   label:      Certificate for Digital Signature
   ID:         02
+
+
+********************************************************************************
+</example>
+********************************************************************************
+
 EOF
 
   pkcs11-tool --module "${MODULE}" --login --pin "${PIN}" --list-objects
@@ -108,15 +126,42 @@ sign() {
   [ -x "$(which cfssljson)" ] || die "Couldn't find cfssljson - try $0 install"
 
   OUTFILE=$(mktemp /tmp/signtmpXXXXXX)
+  SAN_CSV=$(join , ${HOSTNAMES})
+
+
+  if [ -x $(which openssl) ] ; then
+    echo "CSR details:"
+    $(which openssl) req -in "${CSR}" -text | grep "Subject:"
+    $(which openssl) req -in "${CSR}" -text | grep "Subject Alternative" -A 1
+  fi
+
+  if [ "x${HOSTNAMES}" != "x" ] ; then
+    echo "Producing SAN for:"
+    for h in ${HOSTNAMES}; do
+      echo "* ${h}"
+    done
+  fi
+
+  echo "Profile in use: ${PROFILE}"
+  echo " "
+  echo "Sign? [y/N], or press ctrl-c to cancel"
+  read x
+  if [ "${x}" != "y" ] && [ "${x}" != "Y" ] ; then
+    exit 0
+  fi
 
   cfssl sign -ca="${CACERT}" -pkcs11-module="${MODULE}" \
     -pkcs11-label="${LABEL}" -pkcs11-token="${SLOT}" -pkcs11-pin="${PIN}" \
-    -config="${CONFIG}" -profile="${PROFILE}" \
+    -config="${CONFIG}" -profile="${PROFILE}" -hostname="${SAN_CSV}" \
     "${CSR}" > "${OUTFILE}" || die "Signing failure. Likely spurious. Maybe retry?" \
     "$(cat ${OUTFILE})"
 
   cfssljson -bare "${CERTDIR}/${CERT_ID}" < "${OUTFILE}" || die "Failed to save"
   rm -f "${OUTFILE}"
+
+  if [ -x $(which openssl) ] ; then
+    $(which openssl) x509 -in "${CERTDIR}/${CERT_ID}.pem" -text
+  fi
 
   echo "Produced: "
   ls -la "${CERTDIR}/${CERT_ID}"*
@@ -124,7 +169,7 @@ sign() {
 
 help() {
 cat <<EOF
-$0 [-debug] {command} [CSR]
+$0 [-debug] {command} [CSR] {SAN Name 1..n}
 
 Options:
   -debug    Enable PKCS11 Debugging with the OpenSC PKCS11 Spy
@@ -148,7 +193,10 @@ if [ "$1" == "-debug" ] ; then
 fi
 
 if [ "$1" == "sign" ] ; then
-  CSR="$2"
+  shift
+  CSR="$1"
+  shift
+  HOSTNAMES="$@"
   [ -r "${CSR}" ] || die "Cannot open CSR: ${CSR}"
   sign
 elif [ "$1" == "install" ] ; then
